@@ -80,76 +80,71 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-    
-    const {email, username, password} = req.body;
+    const { email, username, password } = req.body;
 
-    if(!username || !email){
-        throw new ApiError(400, "username and email is required")
+    if (!(username || email)) {
+        throw new ApiError(400, "username or email is required");
     }
 
-    const user = User.findOne({
-        $or: [{username}, {email}]
-    })
+    // ✅ await added here
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    });
 
-    if(!user){
-        throw new ApiError(400, "user does not exist")
+    if (!user) {
+        throw new ApiError(400, "User does not exist");
     }
 
+    // ✅ Now user is a mongoose document, so this works
     const isPasswordValid = await user.isPasswordCorrect(password);
 
-    if(!isPasswordValid){
-        throw new ApiError(401, "password incorrect")
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Password incorrect");
     }
 
-    const {accessToken, refreshToken} = await generateAccessandRefreshTokens(user._id)
+    const { accessToken, refreshToken } = await generateAccessandRefreshTokens(user._id);
 
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
     const options = {
         httpOnly: true,
         secure: true
-    }
+    };
 
     return res
-    .status(200)
-    .cokkie("accessToken" ,accessToken, options)
-    .cokkie("refreshToken", refreshToken, options)
-    .json(
-        new ApiResponse(
-            200,
-            {
-                user: loggedInUser, accessToken, refreshToken
-            },
-            "User looged in successfully"
-        )
-    )
+        .status(200)
+        .cookie("accessToken", accessToken, options)   // ✅ fixed spelling
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                { user: loggedInUser, accessToken, refreshToken },
+                "User logged in successfully"
+            )
+        );
 });
 
 
 const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
-        {
-            $set: {
-                refreshToken: undefined
-            }
-        },
-        {
-            new: true
-        }
-    )
+        { $set: { refreshToken: undefined } },
+        { new: true }
+    );
+
     const options = {
         httpOnly: true,
         secure: true
-    }
+    };
 
     return res
-    .status(200)
-    .clearToken("accessToken", options)
-    .clearToken("refreshToken", options)
-    .json(new ApiResponse(200, {}, "User logged out"))
-})
+        .status(200)
+        .clearCookie("accessToken", options)   // ✅ fixed
+        .clearCookie("refreshToken", options)  // ✅ fixed
+        .json(new ApiResponse(200, {}, "User logged out"));
+});
 
 
-export default { registerUser, loginUser, logoutUser };
+export { registerUser, loginUser, logoutUser };
+
  
